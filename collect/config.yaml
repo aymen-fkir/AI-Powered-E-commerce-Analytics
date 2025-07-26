@@ -1,0 +1,6 @@
+mockaroo:
+  url: 'https://my.api.mockaroo.com/users.json'
+
+supabase:
+  bucketName: 'datalake'
+  path: 'crawler1'
