@@ -11,7 +11,7 @@ import uuid
 import json
 import traceback
 import tqdm
-
+from ollama import Client
 
 # ------------------------------------------------------------------------------------------------------------
 class ItemReview(BaseModel):
@@ -25,7 +25,7 @@ class Response(BaseModel):
 
 class Process:
     """
-    A class to process a batch of items using the Gemini API in a single request.
+    A class to process a batch of items using the model API in a single request.
     """
     def __init__(self, client: Client, model: str,sp_client:SPClient,bucketName:str) -> None:
         self.client = client
@@ -46,22 +46,10 @@ class Process:
             Return ONLY the JSON array. Do not add explanations or comments.
             """
 
-    
-    def concatResponse(self,iteratore)->str:
-        full_response_text = ""
-        for chunk in iteratore:
-            # Some chunks might be empty or contain safety metadata without text
-            if hasattr(chunk, 'text'):
-                full_response_text += chunk.text
 
-        if not full_response_text:
-            raise ValueError("The API response stream was empty.")
-        else:
-            return full_response_text
-
-    def getInfo(self, items: List[str],batch_size: int = 100) -> List[dict]:
+    def getInfo(self, items: List[str],batch_size: int = 10000) -> List[dict]:
         """
-        Sends batched item lists to the Gemini API to get classification + reviews.
+        Sends batched item lists to the model API to get classification + reviews.
         Each batch is limited to `batch_size` items to avoid output truncation.
         """
 
@@ -77,20 +65,22 @@ class Process:
             # Build prompt
             item_list_str = ",\n".join([f'"{item}"' for item in batch_items])
             try:
-                response_iteratore = self.client.models.generate_content_stream(
+                response = self.client.chat(
+                    messages=[
+                        {
+                        'role': 'user',
+                        'content': self.prompt.format(item_list_str=item_list_str),
+                        }
+                    ],
                     model=self.model,
-                    contents=[self.prompt.format(item_list_str=item_list_str)],
-                    config=types.GenerateContentConfig(
-                        response_mime_type='application/json',
-                        response_schema=Response,
-                        max_output_tokens=8192,
-                        temperature=0.9
-                    ),
-                )
+                    format=Response.model_json_schema(),
+                    )
 
-                full_response = self.concatResponse(response_iteratore)
-
-                validated_response = Response.model_validate_json(full_response)
+                content = response.message.content
+                if not content:
+                    raise ValueError("model Responce is ",content)
+                
+                validated_response = Response.model_validate_json(content)
                 all_reviews.extend([review.model_dump() for review in validated_response.reviews])
                 
             except json.JSONDecodeError as e:
@@ -186,12 +176,12 @@ class Process:
                 print("No files found in the bucket.")
                 return
 
-            data: pd.DataFrame = self.getListitems(files=files[:1])
+            data: pd.DataFrame = self.getListitems(files=files)
 
             # Call your getInfo logic on first 3 items
             responce:list[dict]|None = self.getInfo(items=data["product_name"].to_list())
             if not responce:
-                raise ValueError("gemini responce is ",responce)
+                raise ValueError("model responce is ",responce)
             
             data = self.update(data=data,products=responce)
             self.saveTofile(data=data)
@@ -208,25 +198,22 @@ class Process:
 
 if __name__ == "__main__":
     load_dotenv()
-    key:str|None = os.getenv("gemini_key")
     url:str|None = os.getenv("project_url")
     spkey:str|None = os.getenv("project_key")
 
-    if not key or not url or not spkey:
+    if  not url or not spkey:
         raise ValueError("(GEMINI_KEY/PROJECT_URL/PROJECT_KEY) not found in environment variables.")
 
     try:
-        # It's good practice to initialize the client within a try block
-        client:Client = Client(api_key=key)
 
         # Define the list of items you want to process
         sp_client:SPClient = SPClient(url,spkey)
-
+        client = Client(host="https://4abeed9f284a.ngrok-free.app")
         # Instantiate the Process class with the list of items
         process:Process = Process(client=client,
                           sp_client=sp_client,
                           bucketName="datalake",
-                          model="models/gemini-2.0-flash-lite", # Using a recommended model
+                          model="gemma3-4b-aymen", # Using a recommended model
                           )
 
         # Get and print the information for all items in one go
