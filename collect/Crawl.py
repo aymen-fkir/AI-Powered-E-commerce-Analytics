@@ -80,13 +80,15 @@ if __name__ == "__main__":
             raise ValueError("Missing environment variable: project_url or project key")
         client = create_client(url,key)
 
-        current_path = os.getcwd()
-        with open(os.path.join(current_path,"config.yaml")) as file:
+        script_current_dir = os.path.dirname(os.path.abspath(__file__))
+        main_dir = os.path.dirname(script_current_dir)
+
+        with open(os.path.join(main_dir,"config.yaml")) as file:
             config = yaml.safe_load(file)
         extract = Crawler(
             url=config["mockaroo"]["url"],
             apiKey=apiKey,
-            path=config["supabase"]["path"],
+            path=config["supabase"]["path_raw_data"],
             bucket_name=config["supabase"]["bucketName"],
             client=client
             )

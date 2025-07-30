@@ -6,6 +6,7 @@ WORKDIR /app
 
 # Copy files
 COPY . .
+COPY ../config.yaml .
 
 # Install dependencies
 RUN pip install --no-cache-dir -r requirements.txt

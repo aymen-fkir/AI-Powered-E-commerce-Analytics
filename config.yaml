@@ -1,0 +1,11 @@
+mockaroo:
+  url: 'https://my.api.mockaroo.com/users.json'
+
+supabase:
+  bucketName: 'datalake'
+  path_raw_data: 'crawler1'
+  path_review_data : 'processed'
+
+ollama:
+  model_name: 'gemma3-4b-aymen'
+  hostname: 'https://2ed03a33b520.ngrok-free.app'
