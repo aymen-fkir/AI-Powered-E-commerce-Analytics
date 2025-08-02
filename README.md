@@ -2,5 +2,4 @@
 
 
 
-### Note project :
-**project not finished yet :)**
+**Note project :** project not finished yet :)
