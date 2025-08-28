@@ -4,7 +4,6 @@ from pydantic import BaseModel, Field
 from typing import List
 import io
 from supabase import Client as SPClient
-import pandas as pd 
 from datetime import datetime
 import uuid
 import json
@@ -13,8 +12,8 @@ import tqdm
 from ollama import Client
 import yaml
 import polars as pl
-from datetime import date
-
+import logging
+logging.basicConfig(level=logging.INFO)
 # ------------------------------------------------------------------------------------------------------------
 class ItemReview(BaseModel):
     item_name: str = Field(description="The name of the item being reviewed.")
@@ -29,12 +28,13 @@ class Process:
     """
     A class to process a batch of items using the model API in a single request.
     """
-    def __init__(self, client: Client|None, model: str,sp_client:SPClient,bucket_name:str,path:str) -> None:
+    def __init__(self, client: Client|None, model: str,sp_client:SPClient,bucket_name:str,path:str,data_path:str) -> None:
         self.client = client
         self.model = model
         self.sp_client = sp_client
         self.bucket_name = bucket_name
         self.path = path
+        self.data_path = data_path
         self.prompt = """
             Please classify each of the following items and provide a brief review for each one.
             The items are:
@@ -50,7 +50,7 @@ class Process:
             """
 
 
-    def getInfo(self, items: List[str],batch_size: int = 10000) -> List[dict]:
+    def getInfo(self, items: List[str],batch_size: int = 100) -> List[dict]:
         """
         Sends batched item lists to the model API to get classification + reviews.
         Each batch is limited to `batch_size` items to avoid output truncation.
@@ -65,10 +65,13 @@ class Process:
         list_of_batches = list(chunk_items(items, batch_size))
         if not self.client:
             return [{}]
+        
         for batch_items in tqdm.tqdm(list_of_batches):
             # Build prompt
+            
             item_list_str = ",\n".join([f'"{item}"' for item in batch_items])
             try:
+                logging.info("started the model")
                 response = self.client.chat(
                     messages=[
                         {
@@ -81,10 +84,14 @@ class Process:
                     )
 
                 content = response.message.content
-                if not content:
+                if not content :
                     raise ValueError("model Responce is ",content)
                 
                 validated_response = Response.model_validate_json(content)
+
+                if len(validated_response.reviews) != batch_size:
+                    raise ValueError("model response and items lenght doesn't match")
+                
                 all_reviews.extend([review.model_dump() for review in validated_response.reviews])
                 
             except json.JSONDecodeError as e:
@@ -93,6 +100,7 @@ class Process:
             except Exception as e:
                 print(f"failed: {e}")
                 traceback.print_exc()
+            
         
         return all_reviews
 
@@ -136,13 +144,13 @@ class Process:
         row_indices = pl.Series("row_index", range(num_rows_df))
         repeated_shops_indices = row_indices % num_unique_dates_in_range
 
-        generated_dates_column = pl.Series(
+        generated_shop_ids_column = pl.Series(
             "shop_id",
             [base_ids[i] for i in repeated_shops_indices]
         )
 
         # Add this new series as a new column to the DataFrame
-        df_with_dates = data.with_columns(generated_dates_column)
+        df_with_dates = data.with_columns(generated_shop_ids_column)
 
         return df_with_dates
 
@@ -196,8 +204,8 @@ class Process:
             raise Exception(f"getListItems error : {e}")
             
     def update(self,data:pl.DataFrame,products:list[dict])->pl.DataFrame:
-            productsDf = pl.DataFrame(products)
-            data = pl.concat([data,productsDf])
+            #productsDf = pl.DataFrame(products)
+            #data = pl.concat([data,productsDf],how="horizontal")
             data = self.addShops(data)
             data = self.addUsers(data)
             return data
@@ -220,6 +228,8 @@ class Process:
                 )
         except Exception as e:
             raise e
+    def saveLocaly(self,data:pl.DataFrame,path:str)->None:
+        data.write_parquet(os.path.join(path,"data","data.parquet"))
 
     def main(self) -> None:
         """
@@ -235,12 +245,15 @@ class Process:
             data: pl.DataFrame = self.getListitems(files=files)
 
             # Call your getInfo logic on first 3 items
-            responce:list[dict]|None = self.getInfo(items=data["product_name"].to_list())
-            if not responce:
-                raise ValueError("model responce is ",responce)
+            #responce:list[dict]|None = self.getInfo(items=data["product_name"].to_list())
             
-            data = self.update(data=data,products=responce)
-            self.saveTofile(data=data)
+            
+            # if not responce:
+            #     raise ValueError("model responce is ",responce)
+            
+            data = self.update(data=data,products=[{}])
+            #self.saveTofile(data=data)
+            self.saveLocaly(data=data,path=self.data_path)
 
         except Exception as e:
             print(f"ETL process failed: {e}")
@@ -258,7 +271,7 @@ if __name__ == "__main__":
     spkey:str|None = os.getenv("project_key")
 
     if  not url or not spkey:
-        raise ValueError("(GEMINI_KEY/PROJECT_URL/PROJECT_KEY) not found in environment variables.")
+        raise ValueError("(PROJECT_URL/PROJECT_KEY) not found in environment variables.")
 
     try:
         script_current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -274,7 +287,8 @@ if __name__ == "__main__":
                           sp_client=sp_client,
                           bucket_name=config["supabase"]["bucketName"],
                           model=config["ollama"]["model_name"], # Using a recommended model
-                          path=config["supabase"]["path_review_data"])
+                          path=config["supabase"]["path_review_data"],
+                          data_path=main_dir)
 
         # Get and print the information for all items in one go
         process.main()

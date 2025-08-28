@@ -7,5 +7,5 @@ supabase:
   path_review_data : 'processed'
 
 ollama:
-  model_name: 'gemma3-4b-aymen'
-  hostname: 'https://2ed03a33b520.ngrok-free.app'
+  model_name: 'openhermes:7b-mistral-v2.5-q4_0'
+  hostname: 'http://localhost:11434'

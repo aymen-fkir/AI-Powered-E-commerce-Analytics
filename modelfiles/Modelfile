@@ -1,0 +1,4 @@
+FROM gemma3:270m
+PARAMETER num_ctx 6096
+PARAMETER temperature 0.9
+PARAMETER num_predict -1

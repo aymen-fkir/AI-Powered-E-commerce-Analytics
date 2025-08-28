@@ -2,3 +2,5 @@
 .venv
 .dockerignore
 savedResponse.txt
+data/*
+logs/*
