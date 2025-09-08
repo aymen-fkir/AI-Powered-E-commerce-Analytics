@@ -98,7 +98,7 @@ class ETL:
     
     def genrateKpis(self,data:pl.DataFrame)->pl.DataFrame:
         group_by_shop = data.lazy().group_by(pl.col("shop"))
-        sales_by_shop = group_by_shop.agg(pl.col("price").mean().alias("average_profit")).collect()
+        sales_by_shop = group_by_shop.agg(pl.col("price").mean().alias("average_profit")).collect(engine="gpu)
         count_reviews = group_by_shop.agg(pl.col("sentiment").sum().alias("postive_reviews"),
                                           (~pl.col("sentiment")).sum().alias("negative_reviews")
                                           )
@@ -108,7 +108,7 @@ class ETL:
                             pl.when(pl.col("negative_reviews") > 1)
                             .then(pl.col("negative_reviews"))
                             .otherwise(1)).alias("likeness_score").cast(pl.Float64))
-                        ).collect()
+                        ).collect(engine="gpu")
         normalized_score = self.minMax(review_score)
 
         sales_by_shop = sales_by_shop.join(normalized_score,on="shope",how="left")
