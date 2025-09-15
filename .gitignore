@@ -4,3 +4,5 @@
 savedResponse.txt
 data/*
 logs/*
+Server/Models/*
+!Server/Models/.gitkeep
