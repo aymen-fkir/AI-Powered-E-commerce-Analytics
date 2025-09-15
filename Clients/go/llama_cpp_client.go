@@ -1,11 +1,13 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"log"
 	"sync"
 	"time"
+	"os"
 
 	openai "github.com/openai/openai-go/v2"
 	"github.com/openai/openai-go/v2/option"
@@ -15,11 +17,14 @@ import (
 	"encoding/json"
 
 	"github.com/invopop/jsonschema"
+	storage_go "github.com/supabase-community/storage-go"
 )
 
 // The URL of your running llama.cpp server.
 // It must include the /v1 suffix to be compatible with the OpenAI API.
-const llamaCPPBaseURL = "http://localhost:8080/v1"
+
+
+
 
 
 // define types
@@ -35,17 +40,15 @@ type Item struct {
 }
 
 type Product struct {
-	ProductName        string  `parquet:"product_name"`
-	Price              float64 `parquet:"price"`
-	Quantity           int64   `parquet:"quantity"`
-	Category           string  `parquet:"category"`
-	Description        string  `parquet:"description"`
-	Availability       bool    `parquet:"availability"`
-	DiscountPercentage float64 `parquet:"discount_percentage"`
-	Date               string  `parquet:"date"`
-	ShopID             string  `parquet:"shop_id"`
-	ID                 string  `parquet:"id"`
-	ItemID             int64   `parquet:"item_id"`
+	ProductName        string  `json:"product_name"`
+	Price              float32 `json:"price"`
+	Quantity           int     `json:"quantity"`
+	Category           string  `json:"category"`
+	Description        string  `json:"description"`
+	Availability       bool    `json:"availability"`
+	DiscountPercentage float32 `json:"discount_percentage"`
+	Date               string  `json:"date"`
+	ItemID             int     `json:"item_id"`
 }
 
 
@@ -60,12 +63,28 @@ type Response struct {
 	Reviews []ItemReview `json:"reviews" jsonschema:"title=Reviews,description=A list of classifications and reviews for the provided items.,minItems=25,maxItems=25"`
 }
 
+type MergedResponse struct {
+	ProductName        string  `json:"product_name"`
+	Price              float32 `json:"price"`
+	Quantity           int     `json:"quantity"`
+	Category           string  `json:"category"`
+	Description        string  `json:"description"`
+	Availability       bool    `json:"availability"`
+	DiscountPercentage float32 `json:"discount_percentage"`
+	Date               string  `json:"date"`
+	ItemID             int     `json:"item_id"`
+	Classification     string  `json:"classification"`
+	Review             string  `json:"review"`
+	
+}
 
-// Global shared variables   
+// Global shared variables 
 
 var (
 	resultsMu sync.Mutex
-	results   map[int]Response = make(map[int]Response)
+	fileMu sync.Mutex
+	filesdata []Product
+	results   []Response
 	logMu     sync.Mutex
 )
 
@@ -84,8 +103,8 @@ func GenerateSchema[T any]() interface{} {
 }
 
 
-func transform(data []Item,batchsize int ) [][]Item {
-	var transformed [][]Item
+func transform[T any](data []T,batchsize int ) [][]T {
+	var transformed [][]T
 	for i := 0; i < len(data); i += batchsize {
 		end := i + batchsize
 		if end > len(data) {
@@ -197,7 +216,7 @@ func handleRequest(ctx context.Context, client openai.Client, prompt []message,p
 			resultsMu.Lock()
 			var response Response
 			_ = json.Unmarshal([]byte(chatCompletion.Choices[0].Message.Content), &response)
-			results[process_id] = response
+			results = append(results, response)
 			resultsMu.Unlock()
 			log.Printf("Request successful, data appended.\n")
 			return // Success, exit goroutine
@@ -242,7 +261,6 @@ func execution(data [][]Item, client openai.Client) {
 			}(prompts[j])
 		}
 		wg.Wait()
-		break
 	}
 
 }
@@ -256,27 +274,192 @@ func logError(errMsg string) {
 	logMu.Unlock()
 }
 
+//create a supdabase client
+// list all files in bucket
+
+func listFilesInBucket(client *storage_go.Client, bucketName string) ([]string, error) {
+
+	files, err := client.ListFiles(bucketName,"crawler1", storage_go.FileSearchOptions{
+		SortByOptions: storage_go.SortBy{
+			Column: "created_at",
+			Order:  "asc",
+		},
+	})
+	
+	if err != nil {
+		return nil, err
+	}
+
+	var fileNames []string
+	for _, file := range files {
+		fileName := fmt.Sprintf("%s/%s", bucketName, file.Name)
+		fileNames = append(fileNames, fileName)
+	}
+	return fileNames, nil
+}
+// using go routine download the files
+
+func handleFileDownload(client *storage_go.Client, fileName string, wg *sync.WaitGroup) {
+			defer wg.Done()
+			result, err := client.DownloadFile("bucket-id", fileName)
+			if err != nil {
+				logError(err.Error())
+			} else {
+				fileMu.Lock()
+				var product Product
+				err = json.Unmarshal(result, &product)
+				if err != nil {
+					logError(err.Error())
+				} else {
+					filesdata = append(filesdata, product)
+				}
+				fileMu.Unlock()
+				logError("successfully downloaded file: " + fileName)
+			}
+		}
+
+func downloadFile(client *storage_go.Client, bucketName string, fileNames []string) error {
+	var wg sync.WaitGroup
+	for ind, fileName := range fileNames {
+		wg.Add(1)
+		go handleFileDownload(client, fileName, &wg)
+		if ind%5 == 0 {
+			wg.Wait() // Wait for current batch to finish
+		}
+	}
+	return nil
+}
+
+// process the files and extract the data
+
+func processFilesData(data []Product) [][]Item {
+	var items [][]Item
+	var elements []Item
+
+	for _, product := range data {
+		item := Item{
+			ItemID:      int(product.ItemID),
+			Description: product.Description,
+		}
+		elements = append(elements, item)
+	}
+	items = transform(elements, BATCHSIZE)
+	return items
+}
+
+//the extract function that read execute all the commands
+
+func extract(client *storage_go.Client, bucketName string) [][]Item {
+	fileNames, err := listFilesInBucket(client, bucketName)
+	if err != nil {
+		logError(err.Error())
+		return nil
+	}
+	err = downloadFile(client, bucketName, fileNames)
+	if err != nil {
+		logError(err.Error())
+		return nil
+	}
+	items := processFilesData(filesdata)
+	return items
+}
+
+//function that merge both of the response and the data based on item id
+func mergeResponses() []MergedResponse {
+	var merged []MergedResponse
+	var resultsList map[int]ItemReview = make(map[int]ItemReview)
+	// Create a map for quick lookup of reviews by ItemID
+	for _, response := range results {
+		for _, review := range response.Reviews {
+			resultsList[review.ItemID] = review
+		}
+	}
+
+
+	for _, product := range filesdata {
+		if review, exists := resultsList[product.ItemID]; exists {
+			merged = append(merged, MergedResponse{
+						ProductName:        product.ProductName,
+						Price:              product.Price,
+						Quantity:           product.Quantity,
+						Category:           product.Category,
+						Description:        product.Description,
+						Availability:       product.Availability,
+						DiscountPercentage: product.DiscountPercentage,
+						Date:               product.Date,
+						ItemID:             product.ItemID,
+						Classification:     review.Classification,
+						Review:             review.Review,
+					})
+		}
+	}
+	return merged
+}
+
+
+func uploadBatch(client *storage_go.Client, bucketName string, batch []MergedResponse ,wg *sync.WaitGroup) {
+			defer wg.Done()
+			bites,err:= json.Marshal(batch)
+			if err != nil {
+				logError(err.Error())
+			} else 
+			{
+				contentType := "application/json"
+				upsert := true
+				client.UploadFile(bucketName, fmt.Sprintf("processed/processed_data_%d.json", time.Now().Unix()), bytes.NewReader(bites), storage_go.FileOptions{
+					ContentType:  &contentType,
+					Upsert:       &upsert,
+				})
+				
+			logError("successfully uploaded file: " + fmt.Sprintf("processed_data_%d.json", time.Now().Unix()))
+			}
+				
+		}
+
+// create the load function that load the data in supdabase silver bucket in go routine
+func UploadFile(client *storage_go.Client, bucketName string, batchdata [][]MergedResponse) {
+	var wg sync.WaitGroup
+	for ind, batch := range batchdata {
+		wg.Add(1)
+		go uploadBatch(client, bucketName, batch,&wg)
+		if ind%5 == 0 {
+			wg.Wait() 
+		}
+	}
+}
+
+func load(client *storage_go.Client, bucketName string) {
+	mergedData := mergeResponses()
+	var batchdata [][]MergedResponse = transform(mergedData, 50000)
+	UploadFile(client, bucketName, batchdata)
+}
+
 func main() {
 
 	// Initialize the go-openai client with the llama.cpp server URL
 	// The API key is often a dummy value for local servers
-	
+	project_id := os.Getenv("project_url")
+	project_key := os.Getenv("project_key")
+	storageclient := storage_go.NewClient(project_id, project_key, nil)
+
+
+	llamaCPPBaseURL := os.Getenv("LLAMA_CPP_BASE_URL")
+	if llamaCPPBaseURL == "" {
+		llamaCPPBaseURL = "http://localhost:8000/v1"
+	}
 	client := openai.NewClient(
 		option.WithBaseURL(llamaCPPBaseURL),
 		option.WithAPIKey("dummy"),
 	)
 
 	//read parquet
-	var file_path string = "../../data/data.parquet"
-	var data [][]Item = read_parquet(file_path)
-	var parts []Response
+	//read from supabase
+	var data [][]Item = extract(storageclient, "datalake")
+	
 	start := time.Now()	
 	execution(data, client)
 	log.Printf("Processing time: %v\n", time.Since(start))
-	for i:=0; i<len(results); i++ {
-		parts = append(parts, results[i])
-	}
-	log.Printf("Final aggregated results: %+v\n\n", parts)
-
+	load(storageclient, "datalake")
+	log.Printf("Process completed successfully.\ndata stored in processed folder")
 	
 }

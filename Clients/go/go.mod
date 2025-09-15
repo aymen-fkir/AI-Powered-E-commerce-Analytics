@@ -14,6 +14,7 @@ require (
 	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/parquet-go/parquet-go v0.25.1 // indirect
 	github.com/pierrec/lz4/v4 v4.1.21 // indirect
+	github.com/supabase-community/storage-go v0.8.1 // indirect
 	github.com/tidwall/gjson v1.14.4 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
 	github.com/tidwall/pretty v1.2.1 // indirect
