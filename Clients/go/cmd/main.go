@@ -47,8 +47,8 @@ func (p *Pipeline) Run(enableCleanup bool) error {
 	log.Println("Phase 2: Enriching data with AI...")
 	start = time.Now()
 	// For demonstration, processing only first 4 batches
-	if len(items) > 4 {
-		items = items[:4]
+	if len(items) > 40 {
+		items = items[:40]
 	}
 	p.enricher.Execution(items)
 	log.Printf("AI processing completed in %v", time.Since(start))

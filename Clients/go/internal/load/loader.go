@@ -53,6 +53,8 @@ func (l *Loader) MergeResponses(filesData []models.Product, results []models.Res
 				ItemID:             review.ItemID,
 				Classification:     review.Classification,
 				Review:             review.Review,
+				UserID:             product.UserID,
+				ShopID:             product.ShopID,
 			})
 		}
 	}
