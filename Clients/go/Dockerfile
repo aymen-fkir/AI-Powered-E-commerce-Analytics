@@ -17,7 +17,8 @@ RUN go mod download
 COPY . .
 
 # Build the application
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o llama_cpp_client .
+RUN go mod tidy
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o bin/etl-pipeline ./cmd/main.go
 
 # Use a minimal alpine image for the final stage
 FROM alpine:latest
@@ -33,7 +34,7 @@ RUN addgroup -g 1001 -S appuser && \
 WORKDIR /app
 
 # Copy the binary from the builder stage
-COPY --from=builder /app/llama_cpp_client .
+COPY --from=builder /app/bin/etl-pipeline .
 
 # Create data directory for parquet files
 RUN mkdir -p /app/data
@@ -48,4 +49,4 @@ USER appuser
 EXPOSE 8080
 
 # Command to run the application
-CMD ["./llama_cpp_client"]
+CMD ["./etl-pipeline"]
