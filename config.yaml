@@ -3,8 +3,10 @@ mockaroo:
 
 supabase:
   bucketName: 'datalake'
-  path_raw_data: 'crawler1'
-  path_review_data : 'processed'
+  path_raw_data:
+    new: 'bronze/new'
+    old: 'bronze/old'
+  path_review_data : 'silver'
 
 ollama:
   model_name: 'openhermes:7b-mistral-v2.5-q4_0'

@@ -34,7 +34,7 @@ services:
         "--cache-type-v", "f16",
         "--mlock",
         "--cont-batching",
-        "--parallel", "5",
+        "--parallel", "4",
         "--defrag-thold", "0.1",
         "--verbosity", "1",
         "--log-file", "/logs/http_requests.log",
@@ -44,15 +44,16 @@ services:
     ports:
       - "8000:8000"
     healthcheck:
-      test: ["CMD-SHELL", "curl --fail http://localhost:8000 || exit 1"]
-      interval: 10s
+      test: ["CMD-SHELL", "curl --fail http://localhost:8000/health && exit 0 || exit 1"]
+      interval: 3600s
       timeout: 5s
-      retries: 5
+      retries: 2
+      start_period: 5s
 
   go-client:
     image: go-client:latest
     build:
-      context: ./Client/go/
+      context: ./Clients/go/
       dockerfile: Dockerfile
     container_name: go-client
     restart: unless-stopped
@@ -64,6 +65,18 @@ services:
       - LLAMA_CPP_BASE_URL=http://llama:8000/v1
     volumes:
       # Mount data directory for parquet files
-      - ./data:/app/data:ro
+      - .env:/app/.env:ro
     ports:
       - "8080:8080"
+  collector:
+    image: collector:latest
+    build:
+      context: ./collect/
+      dockerfile: Dockerfile
+    container_name: data-collector
+    restart: unless-stopped
+    volumes:
+      - .env:/app/.env:ro
+      - config.yaml:/app/config.yaml:ro
+    ports:
+      - "5050:5050"
