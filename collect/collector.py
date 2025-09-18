@@ -8,16 +8,21 @@ from dotenv import load_dotenv
 import yaml
 from datetime import datetime
 import logging
+import polars as pl
 logging.basicConfig(level=logging.INFO)
 
+##test this file
 
-class Crawler:
+class Collector:
     def __init__(self,url:str,apiKey,client:Client,bucket_name:str,path:str):
         self.url = url
         self.apiKey = apiKey
         self.client = client
         self.bucket_name = bucket_name
         self.path = path
+        self.ids = [str(uuid.uuid4()) for _ in range(10_000)]
+        self.shop_ids = [f"shop_{i}" for i in range(10_000)]
+
         
     def getData(self):
         try:
@@ -31,7 +36,52 @@ class Crawler:
         except Exception as e:
             raise Exception(f"Unexpected error: {e}")
 
+    def addUsers(self,data:pl.DataFrame)->pl.DataFrame:
+
+        num_rows_df = data.height
+
+        base_ids = pl.Series(
+            self.ids,dtype=pl.String
+        ).alias("id")
+
+        num_unique_dates_in_range = base_ids.len()
+
+        row_indices = pl.Series("row_index", range(num_rows_df))
+        repeated_date_indices = row_indices % num_unique_dates_in_range
+
+        generated_ids_column = pl.Series(
+            "id",
+            [base_ids[i] for i in repeated_date_indices]
+        )
+
+        # Add this new series as a new column to the DataFrame
+        df_with_dates = data.with_columns(generated_ids_column)
+
+        return df_with_dates
         
+    def addShops(self,data:pl.DataFrame)->pl.DataFrame:
+        num_rows_df = data.height
+
+        base_ids = pl.Series(
+            self.shop_ids,dtype=pl.String
+        ).alias("shop_id")
+
+        num_unique_dates_in_range = base_ids.len()
+
+        row_indices = pl.Series("row_index", range(num_rows_df))
+        repeated_shops_indices = row_indices % num_unique_dates_in_range
+
+        generated_shop_ids_column = pl.Series(
+            "shop_id",
+            [base_ids[i] for i in repeated_shops_indices]
+        )
+
+        # Add this new series as a new column to the DataFrame
+        df_with_dates = data.with_columns(generated_shop_ids_column)
+
+        return df_with_dates    
+    
+
     def upload(self,data:list[dict])->None:
         try:
             jsonBytes = json.dumps(data).encode("utf-8")
@@ -58,6 +108,9 @@ class Crawler:
             data.extend(self.getData())
             counter += 1
             if counter >= max_size:
+                data = self.addUsers(pl.DataFrame(data))
+                data = self.addShops(data)
+                data = data.to_dicts()
                 self.upload(data)
                 logging.info("Upload successful")
                 data.clear()
@@ -85,7 +138,7 @@ if __name__ == "__main__":
 
         with open(os.path.join(main_dir,"config.yaml")) as file:
             config = yaml.safe_load(file)
-        extract = Crawler(
+        extract = Collector(
             url=config["mockaroo"]["url"],
             apiKey=apiKey,
             path=config["supabase"]["path_raw_data"],
