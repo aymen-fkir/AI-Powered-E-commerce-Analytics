@@ -6,10 +6,11 @@ WORKDIR /app
 
 # Copy files
 COPY . .
-COPY ../config.yaml .
 
 # Install dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
+EXPOSE 5050
+
 # Default command
-CMD ["python", "Crawl.py"]
+CMD ["python", "collector.py"]
