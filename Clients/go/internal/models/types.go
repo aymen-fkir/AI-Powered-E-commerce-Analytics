@@ -22,8 +22,8 @@ type Product struct {
 	Availability       bool    `json:"availability"`
 	DiscountPercentage float32 `json:"discount_percentage"`
 	Date               string  `json:"date"`
-	UserID             int     `json:"user_id"`
-	ShopID             string     `json:"shop_id"`
+	UserID             string  `json:"id"`
+	ShopID             string  `json:"shop_id"`
 }
 
 // ItemReview represents an AI-generated review for an item
@@ -51,6 +51,6 @@ type MergedResponse struct {
 	ItemID             int     `json:"item_id"`
 	Classification     string  `json:"classification"`
 	Review             string  `json:"review"`
-	UserID             int     `json:"user_id"`
+	UserID             string  `json:"id"`
 	ShopID             string  `json:"shop_id"`
 }
