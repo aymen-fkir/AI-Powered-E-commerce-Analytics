@@ -7,6 +7,7 @@ supabase:
     new: 'bronze/new'
     old: 'bronze/old'
   path_review_data : 'silver'
+  path_final_data : 'gold'
 
 ollama:
   model_name: 'openhermes:7b-mistral-v2.5-q4_0'

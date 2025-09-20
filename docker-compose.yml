@@ -43,12 +43,12 @@ services:
       ]
     ports:
       - "8000:8000"
-    healthcheck:
-      test: ["CMD-SHELL", "curl --fail http://localhost:8000/health && exit 0 || exit 1"]
-      interval: 3600s
-      timeout: 5s
-      retries: 2
-      start_period: 5s
+    # healthcheck:
+    #   test: ["CMD-SHELL", "curl --fail http://localhost:8000/health && exit 0 || exit 1"]
+    #   interval: 10s
+    #   timeout: 5s
+    #   retries: 2
+    #   start_period: 5s
 
   go-client:
     image: go-client:latest
@@ -56,10 +56,10 @@ services:
       context: ./Clients/go/
       dockerfile: Dockerfile
     container_name: go-client
-    restart: unless-stopped
-    depends_on:
-      llama:
-        condition: service_healthy
+    restart: on-failure
+    # depends_on:
+    #   llama:
+    #     condition: service_healthy
     environment:
       # Environment variables for the Go application
       - LLAMA_CPP_BASE_URL=http://llama:8000/v1
@@ -77,6 +77,6 @@ services:
     restart: unless-stopped
     volumes:
       - .env:/app/.env:ro
-      - config.yaml:/app/config.yaml:ro
+      - ./config.yaml:/app/config.yaml:ro
     ports:
       - "5050:5050"
