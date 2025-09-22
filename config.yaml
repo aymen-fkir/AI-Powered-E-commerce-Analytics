@@ -6,9 +6,39 @@ supabase:
   path_raw_data:
     new: 'bronze/new'
     old: 'bronze/old'
-  path_review_data : 'silver'
+  path_review_data : 
+    processed : 'silver/processed'
+    to_process : 'silver/to_process'
   path_final_data : 'gold'
 
 ollama:
   model_name: 'openhermes:7b-mistral-v2.5-q4_0'
   hostname: 'http://localhost:11434'
+
+ETLCONFIG:
+  bucket_name: 'datalake'
+  path: 'silver/to_process'
+  model: 'gemma-3-1b'
+  batch_size: 25
+  files : []
+  filesize : []
+  file_to_move : []
+  system_prompt: |
+    You are given a list of items, each item contains these two elements:
+    1: item_id - represents the identifier for product review
+    2: user review - the actual review text
+    
+    Your job is to classify if each review is either negative (False) or positive (True).
+    
+    You must return a JSON object with the following structure:
+    {
+        "sentiments": [
+            {
+                "item_id": <review_id>,
+                "sentiment": <true_for_positive_false_for_negative>
+            }
+        ]
+    }
+    IMPORTANT: You must return exactly the same number of sentiment objects as input items, with each id matching the input id.
+  base_url: 'http://localhost:8000/v1/'
+  destpath: 'silver/processed'

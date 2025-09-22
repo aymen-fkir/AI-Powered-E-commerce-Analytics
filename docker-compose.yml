@@ -74,9 +74,21 @@ services:
       context: ./collect/
       dockerfile: Dockerfile
     container_name: data-collector
-    restart: unless-stopped
+    restart: on-failure
     volumes:
       - .env:/app/.env:ro
       - ./config.yaml:/app/config.yaml:ro
     ports:
       - "5050:5050"
+  etl:
+    image: etl:latest
+    build:
+      context: ./etl_pipeline/
+      dockerfile: Dockerfile
+    container_name: etl-pipeline
+    restart: on-failure
+    volumes:
+      - ./.env:/app/.env:ro
+      - ./config.yaml:/app/config.yaml:ro
+    ports:
+      - "5000:5000"

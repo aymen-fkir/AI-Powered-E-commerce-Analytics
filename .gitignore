@@ -8,3 +8,4 @@ Server/Models/*
 !Server/Models/.gitkeep
 Clients/go/old/
 Clients/go/bin/
+old/*
