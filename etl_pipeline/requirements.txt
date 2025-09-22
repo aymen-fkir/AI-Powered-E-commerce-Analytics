@@ -1,0 +1,41 @@
+# Core ETL Pipeline Dependenciesaccelerate==1.9.0
+
+annotated-types==0.7.0
+
+# Data Processinganyio==4.9.0
+
+polars>=1.0.0
+
+boto3==1.39.13
+
+# AI/LLM Integrationbotocore==1.39.13
+
+openai>=1.0.0
+
+
+# Database & Storagecharset-normalizer==3.4.2
+
+supabase>=2.0.0
+
+debugpy==1.8.16
+
+# Data Validation & Configurationdecorator==5.2.1
+
+pydantic>=2.0.0
+
+python-dotenv>=1.0.0
+
+PyYAML>=6.0.0
+
+
+filelock==3.18.0
+
+# Progress Trackingfsspec==2025.7.0
+
+tqdm>=4.65.0
+google-auth==2.40.3
+
+google-genai==1.27.0
+
+
+
