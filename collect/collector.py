@@ -1,7 +1,6 @@
 import requests 
-import time
 import json
-from supabase import Client,create_client
+from supabase import create_client
 import os
 import uuid
 from dotenv import load_dotenv
