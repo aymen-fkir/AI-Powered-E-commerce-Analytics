@@ -230,7 +230,6 @@ docker-compose up collector
 1. Add model files to `llama.cpp/models/`
 2. Update `config.yaml` with model configuration
 3. Restart llama service
-```
-
 
 **Note**: This project demonstrates modern data engineering practices with AI integration. Perfect for learning microservices architecture, containerization, and ML operations.
+you can read about my Project in This [blog](https://medium.com/@aymenfkir23/building-an-llm-powered-etl-pipeline-for-review-generation-at-scale-6af943c03feb) 
