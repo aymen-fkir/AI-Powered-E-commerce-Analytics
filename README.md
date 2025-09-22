@@ -114,17 +114,17 @@ The storage bucket follow the medalian schema as follow
 Create 3 Database in supabase that follow these schema :
 
 #### Database name (user_kpis)
-```json
+```
 {'id': String, 'average_spent': Float64, 'positive_reviews': UInt32, 'negative_reviews': UInt32, 'likeness_score': Float64, 'normalized_likeness_score': Float64}
 ```
 
 #### Database name (shop_kpis)
-```json
+```
 {'shop_id': String, 'average_profit': Float64, 'positive_reviews': UInt32, 'negative_reviews': UInt32, 'likeness_score': Float64, 'normalized_likeness_score': Float64})
 ```
 
 #### Database name (date_kpis)
-```json
+```
 {'date': String, 'average_profit_per_day': Float64}
 ```
 
