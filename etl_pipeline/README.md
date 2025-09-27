@@ -11,15 +11,20 @@ etl_pipeline/
 │       ├── __init__.py              # Package initialization
 │       ├── main.py                  # Main application orchestrator
 │       ├── models/
-│       │   └── __init__.py          # Pydantic models and data structures
+│       │   └── __init__.py     
+│       │   └── models_schema.py       # Pydantic models and data structures
 │       ├── extract/
-│       │   └── __init__.py          # Data extraction from Supabase
+│       │   └── __init__.py
+│       │   └── data_extractor          # Data extraction from Supabase
 │       ├── transform/
-│       │   └── __init__.py          # AI sentiment analysis & KPI generation
+│       │   └── __init__.py  
+│       │   └── data_transformer.py          # AI sentiment analysis & KPI generation
 │       ├── load/
-│       │   └── __init__.py          # Data loading to various destinations
+│       │   └── __init__.py   
+│       │   └── data_loader.py         # Data loading to various destinations
 │       └── utils/
-│           └── __init__.py          # Common utilities and helpers
+│           └── __init__.py  
+│       │   └── tools.py          # Common utilities and helpers
 ├── requirements.txt                 # Python dependencies                      
 ├── Dockerfile                      # Container configuration              
 └── README.md                       # This file
